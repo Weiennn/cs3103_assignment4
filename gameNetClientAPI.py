@@ -136,7 +136,7 @@ class GameNetClientAPI:
             for seq, entry in self.send_window.items():
                 entry["timer"].cancel()
             self.sock.close()
-1
+
 if __name__ == "__main__":
     client = GameNetClientAPI('localhost', 12345, 'localhost', 54321)
 
