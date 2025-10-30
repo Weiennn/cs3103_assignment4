@@ -3,6 +3,7 @@ import random
 import datetime
 import threading
 from gameNetPacket import GameNetPacket
+import time
 
 # Selective Repeat parameters
 SR_WINDOW_SIZE = 5
@@ -37,6 +38,7 @@ class GameNetClientAPI:
     def send_packet(self, payload, channel_type):
         with self.condition:
             self.buffer.append((payload, channel_type))
+            print(f"[BUFFERED] Channel={channel_type} Payload={payload}")
             self.condition.notify()  # wake up window thread if waiting
 
     # Background thread: move packets from buffer to send window
@@ -107,7 +109,7 @@ class GameNetClientAPI:
             entry["resend_count"] += 1
 
             # restart timer
-            timer = threading.Timer(self.timeout / 1000, self.retransmit_packet, args=(seq,))
+            timer = threading.Timer(self.timeout_ms / 1000, self.retransmit_packet, args=(seq,))
             entry["timer"] = timer
             timer.start()
 
@@ -141,3 +143,5 @@ if __name__ == "__main__":
     client.send_packet(b'Hello Reliable 1', 1)
     client.send_packet(b'Hello Unreliable', 0)
     client.send_packet(b'Hello Reliable 2', 1)
+
+    time.sleep(5)  # wait for packets to be sent and acks to be received
