@@ -10,9 +10,10 @@ SR_WINDOW_SIZE = 5
 BUFFER_SIZE = 1024
 MAX_SEQ_NUM = 2 ** 16  # allow wrap for 16-bit sequence numbers
 RETRANSMISSION_THRESHOLD = 200  # ms
+TIMEOUT = 50  # ms
 
 class GameNetClientAPI:
-    def __init__(self, client_addr, client_port, server_addr, server_port, timeout=50):
+    def __init__(self, client_addr, client_port, server_addr, server_port, timeout=TIMEOUT):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.sock.bind((client_addr, client_port))
         self.sock.setblocking(False)
@@ -39,7 +40,7 @@ class GameNetClientAPI:
         with self.condition:
             self.buffer.append((payload, channel_type))
             print(f"[BUFFERED] Channel={channel_type} Payload={payload}")
-            self.condition.notify()  # wake up window thread if waiting
+            self.condition.notify_all()  # wake up window thread if waiting
 
     # Background thread: move packets from buffer to send window
     def window_packet(self):
@@ -47,6 +48,7 @@ class GameNetClientAPI:
             with self.condition:
                 # wait until window not full and buffer not empty
                 while len(self.send_window) >= SR_WINDOW_SIZE or len(self.buffer) == 0:
+                    print("[WAITING FOR WINDOW...]")
                     self.condition.wait()
 
                 payload, channel_type = self.buffer.pop(0)
@@ -119,7 +121,7 @@ class GameNetClientAPI:
                 data, addr = self.sock.recvfrom(4096)
                 packet = GameNetPacket.from_bytes(data)
 
-                if packet.channel_type == 1 and packet.ack_flag == 1:
+                if packet.channel_type == 1:
                     ack_num = packet.ack_num
                     with self.condition:
                         if ack_num in self.send_window:

@@ -1,7 +1,7 @@
 import socket
 import time
 from collections import deque
-from gameNetAPI import GameNetPacket
+from gameNetPacket import GameNetPacket
 
 # Selective Repeat parameters for reliable channel
 SR_WINDOW_SIZE = 5
@@ -38,6 +38,7 @@ class GameNetServer:
         """Build an ACK packet using the sequence number received."""
         # ACK the exact packet received
         ack_packet = GameNetPacket(channel_type=1, seq_num=0, ack_num=sequence_number)
+        print(f"[ACK CREATED] {ack_packet}")
         return ack_packet.to_bytes()
 
     def get_data(self):
@@ -143,6 +144,7 @@ class GameNetServer:
     def _send_ack(self, seq_num: int):
         """Send ACK for a specific sequence number."""
         if self.client_addr is not None:
+            print(f"[ACK SENT] SeqNo={seq_num}")
             ack_pkt = self.create_ack_packet(seq_num)
             self.socket.sendto(ack_pkt, self.client_addr)
 

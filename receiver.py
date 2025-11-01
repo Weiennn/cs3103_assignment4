@@ -12,7 +12,7 @@ def main():
     server = GameNetServer(addr='localhost', port=54321)
     print("GameNetServer initialized on localhost:54321")
 
-    inactivity_limit = 5  # seconds
+    inactivity_limit = 10  # seconds
     last_packet_time = time.time()
 
     try:
