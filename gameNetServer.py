@@ -58,9 +58,10 @@ class GameNetServer:
         return GameNetPacket.from_bytes(data)
 
     def create_ack_packet(self, sequence_number: int) -> bytes:
-        """Build an ACK packet"""
-        ack_packet = GameNetPacket(
-            channel_type=1, seq_num=0, ack_num=sequence_number)
+        """Build an ACK packet using the sequence number received."""
+        # ACK the exact packet received
+        ack_packet = GameNetPacket(channel_type=1, seq_num=0, ack_num=sequence_number)
+        print(f"[ACK CREATED] {ack_packet}")
         return ack_packet.to_bytes()
 
     def _calculate_latency(self, packet: GameNetPacket) -> float:
@@ -224,6 +225,7 @@ class GameNetServer:
     def _send_ack(self, seq_num: int):
         """Send ACK for specific sequence number"""
         if self.client_addr is not None:
+            print(f"[ACK SENT] SeqNo={seq_num}")
             ack_pkt = self.create_ack_packet(seq_num)
             self.socket.sendto(ack_pkt, self.client_addr)
 
