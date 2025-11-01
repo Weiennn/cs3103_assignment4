@@ -1,3 +1,4 @@
+import time
 import socket
 import time
 import threading
@@ -69,7 +70,8 @@ class GameNetServer:
     def _calculate_latency(self, packet: GameNetPacket) -> float:
         """Calculate one-way latency"""
         if packet.time_stamp > 0:
-            return (time.time() - packet.time_stamp) * 1000  # Convert to ms
+            # time_stamp given in ms
+            return (time.time() * 1000) - packet.time_stamp
         return 0
 
     def _process_socket(self):
@@ -325,8 +327,7 @@ class GameNetServer:
         print("UNRELIABLE CHANNEL:")
         print(f"Packets Received: {metrics["unreliable"]["packets_received"]}")
         print(f"Avg Latency: {metrics["unreliable"]["avg_latency_ms"]:.2f} ms")
-        print(
-            f"Throughput: {metrics["unreliable"]["throughput_bytes"]:.2f} bps")
+        print(f"Throughput: {metrics["unreliable"]["throughput_bytes"]:.2f} bps")
         print(f"Jitter: {metrics["unreliable"]["jitter_ms"]:.2f} ms")
 
     def close(self):

@@ -1,6 +1,5 @@
 import socket
 import random
-import datetime
 import threading
 from gameNetPacket import GameNetPacket
 import time
@@ -64,7 +63,7 @@ class GameNetClientAPI:
                     channel_type=1,
                     payload=payload,
                     seq_num=seq,
-                    time_stamp=int(datetime.datetime.now().timestamp())
+                    time_stamp=int(time.time() * 1000)  # ms precision
                 )
 
                 self.send_window[seq] = {
@@ -88,7 +87,7 @@ class GameNetClientAPI:
             packet = GameNetPacket(
                 channel_type=0,
                 payload=payload,
-                time_stamp=int(datetime.datetime.now().timestamp())
+                time_stamp=int(time.time() * 1000)  # ms precision
             )
             self.sock.sendto(packet.to_bytes(), (self.server_addr, self.server_port))
             print(f"[SEND-UNRELIABLE] {payload}")
@@ -140,7 +139,7 @@ class GameNetClientAPI:
             self.sock.close()
 
 if __name__ == "__main__":
-    client = GameNetClientAPI('localhost', 12345, 'localhost', 54321)
+    client = GameNetClientAPI('localhost', 12345, 'localhost', 12001)
 
     client.send_packet(b'Hello Reliable 1', 1)
     client.send_packet(b'Hello Unreliable', 0)
