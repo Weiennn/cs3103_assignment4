@@ -321,7 +321,7 @@ if __name__ == "__main__":
     # Create server with callback
     server = GameNetServer(
         addr="localhost",
-        port=12001,
+        port=54321,
         timeout_threshold=0.7,  
         callback_function=handle_received_data
     )

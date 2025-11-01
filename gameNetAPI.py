@@ -3,6 +3,8 @@ import datetime
 from gameNetPacket import GameNetPacket
 from datetime import datetime
 
+#TODO: NOT IN USE YET PLEASE IGNORE
+
 # GO back N parameters for reliable channel
 GBN_WINDOW_SIZE = 5
 GBN_TIMEOUT = 0.5  # in seconds
