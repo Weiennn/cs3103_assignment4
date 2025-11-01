@@ -36,4 +36,5 @@ class GameNetPacket:
     def __repr__(self):
         return (f"GameNetPacket(channel_type={self.channel_type}, "
                 f"seq_num={self.seq_num}, time_stamp={self.time_stamp}, "
-                f"ack_num={self.ack_num}, payload_length={len(self.payload)})")
+                f"ack_num={self.ack_num}, "
+                f"payload_length={len(self.payload)})")
