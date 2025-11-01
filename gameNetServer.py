@@ -1,7 +1,7 @@
 import socket
 import time
 from collections import deque
-from gameNetAPI import GameNetPacket
+from gameNetPacket import GameNetPacket
 
 # Selective Repeat parameters for reliable channel
 SR_WINDOW_SIZE = 5
@@ -12,7 +12,7 @@ DEFAULT_PORT = 12001
 DEFAULT_ADDR = 'localhost'
 
 class GameNetServer:
-    def __init__(self, addr=DEFAULT_ADDR, port=DEFAULT_PORT, timeout_threshold=0.2):
+    def __init__(self, addr=DEFAULT_ADDR, port=DEFAULT_PORT, timeout_threshold=1):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((addr, port))
         self.socket.setblocking(False)
@@ -37,7 +37,7 @@ class GameNetServer:
     def create_ack_packet(self, sequence_number: int) -> bytes:
         """Build an ACK packet using the sequence number received."""
         # ACK the exact packet received
-        ack_packet = GameNetPacket(channel_type=1, seq_num=0, ack_num=sequence_number)
+        ack_packet = GameNetPacket(channel_type=1, seq_num=0, ack_num=sequence_number, ack_flag=1)
         return ack_packet.to_bytes()
 
     def get_data(self):
@@ -47,8 +47,8 @@ class GameNetServer:
 
         # Buffer is not empty, return next payload
         if self.output_buffer:
-            payload, channel_type = self.output_buffer.popleft()
-            return [payload, channel_type]
+            payload, channel_type, time_stamp, seq_num = self.output_buffer.popleft()
+            return [payload, channel_type, time_stamp, seq_num]
 
         # Populate buffer
         try:
@@ -60,7 +60,7 @@ class GameNetServer:
 
         # Unreliable channel, return packet immediately
         if packet.channel_type == 0:
-            return [packet.payload, packet.channel_type]
+            return [packet.payload, packet.channel_type, packet.time_stamp, packet.seq_num]
 
         # To get the first sequence number
         if self.first_reliable_packet:
@@ -98,8 +98,8 @@ class GameNetServer:
 
         # Return data if available after processing
         if self.output_buffer:
-            payload, channel_type = self.output_buffer.popleft()
-            return [payload, channel_type]
+            payload, channel_type, time_stamp, seq_num = self.output_buffer.popleft()
+            return [payload, channel_type, time_stamp, seq_num]
 
         return None
 
@@ -127,6 +127,7 @@ class GameNetServer:
 
             # Skip this packet and move window forward
             self.expected_sequence = (self.expected_sequence + 1) % MAX_SEQ_NUM
+            print(f"      [RELIABLE] Moved expected SeqNo to {self.expected_sequence} after timeout")
 
             # Try to deliver any consecutive packets that are now deliverable
             self._drain_in_order()
@@ -152,8 +153,8 @@ class GameNetServer:
 
         while self.expected_sequence in self.reliable_buffer:
             packet = self.reliable_buffer.pop(self.expected_sequence)
-            self.output_buffer.append((packet.payload, packet.channel_type))
-            print(f"[RELIABLE] Delivered SeqNo={self.expected_sequence}")
+            self.output_buffer.append((packet.payload, packet.channel_type, packet.time_stamp, packet.seq_num))
+            # print(f"[RELIABLE] Delivered SeqNo={self.expected_sequence}")
             self.expected_sequence = (self.expected_sequence + 1) % MAX_SEQ_NUM
             delivered_any = True
 

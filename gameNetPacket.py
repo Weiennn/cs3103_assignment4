@@ -19,9 +19,9 @@ class GameNetPacket:
         header = bytearray(HEADER_SIZE)
         header[0] = self.channel_type
         header[1:3] = self.seq_num.to_bytes(2, byteorder='big')
-        header[3:5] = self.time_stamp.to_bytes(4, byteorder='big')
-        header[5:7] = self.ack_num.to_bytes(2, byteorder='big')
-        header[7] = self.ack_flag
+        header[3:7] = self.time_stamp.to_bytes(4, byteorder='big')
+        header[7:9] = self.ack_num.to_bytes(2, byteorder='big')
+        header[9] = self.ack_flag
         return bytes(header) + self.payload
 
     @classmethod
@@ -30,9 +30,9 @@ class GameNetPacket:
             raise ValueError("Data is too short to contain a valid header")
         channel_type = data[0]
         seq_num = int.from_bytes(data[1:3], byteorder='big')
-        time_stamp = int.from_bytes(data[3:5], byteorder='big')
-        ack_num = int.from_bytes(data[5:7], byteorder='big')
-        ack_flag = data[7]
+        time_stamp = int.from_bytes(data[3:7], byteorder='big')
+        ack_num = int.from_bytes(data[7:9], byteorder='big')
+        ack_flag = data[9]
         payload = data[HEADER_SIZE:]
         return cls(channel_type, seq_num, time_stamp, ack_num, ack_flag, payload)
 

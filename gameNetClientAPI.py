@@ -97,6 +97,7 @@ class GameNetClientAPI:
             if not entry or self.sock.fileno() == -1:  # socket closed
                 return
 
+            print(f"[RETRANSMIT] Seq={seq} (Resend Count: {entry['resend_count']}) max_resend_count={self.max_resend_count}")
             if entry["resend_count"] >= self.max_resend_count:
                 print(f"[DROP] Seq={seq} reached max retransmissions.")
                 del self.send_window[seq]
