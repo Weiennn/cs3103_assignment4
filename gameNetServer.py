@@ -296,13 +296,13 @@ class GameNetServer:
         print(f"Out-of-Order: {metrics["reliable"]["out_of_order"]}")
         print(f"Timeouts: {metrics["reliable"]["timeouts"]}")
         print(f"Avg Latency: {metrics["reliable"]["avg_latency_ms"]:.2f} ms")
-        print(f"Throughput: {metrics["reliable"]["throughput_bps"]:.2f} bps")
+        print(f"Throughput: {metrics["reliable"]["throughput_bytes"]:.2f} bps")
         print(f"Delivery Ratio: {metrics["reliable"]["delivery_ratio_pct"]:.2f}%\n")
 
         print("UNRELIABLE CHANNEL:")
         print(f"Packets Received: {metrics["unreliable"]["packets_received"]}")
         print(f"Avg Latency: {metrics["unreliable"]["avg_latency_ms"]:.2f} ms")
-        print(f"Throughput: {metrics["unreliable"]["throughput_bps"]:.2f} bps")
+        print(f"Throughput: {metrics["unreliable"]["throughput_bytes"]:.2f} bps")
 
     def close(self):
         """Clean shutdown of server."""
