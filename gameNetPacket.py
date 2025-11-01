@@ -4,7 +4,9 @@ SEQ_NUM_SIZE = 2
 ACK_NUM_SIZE = 2
 ACK_FLAG_SIZE = 1
 TIME_STAMP_SIZE = 4
-HEADER_SIZE = CHANNEL_TYPE_SIZE + SEQ_NUM_SIZE + TIME_STAMP_SIZE + ACK_NUM_SIZE + ACK_FLAG_SIZE
+HEADER_SIZE = CHANNEL_TYPE_SIZE + SEQ_NUM_SIZE + \
+    TIME_STAMP_SIZE + ACK_NUM_SIZE + ACK_FLAG_SIZE
+
 
 class GameNetPacket:
     def __init__(self, channel_type=0, seq_num=0, time_stamp=0, ack_num=0, ack_flag=0, payload=b''):
@@ -19,9 +21,8 @@ class GameNetPacket:
         header = bytearray(HEADER_SIZE)
         header[0] = self.channel_type
         header[1:3] = self.seq_num.to_bytes(2, byteorder='big')
-        header[3:5] = self.time_stamp.to_bytes(4, byteorder='big')
-        header[5:7] = self.ack_num.to_bytes(2, byteorder='big')
-        header[7] = self.ack_flag
+        header[3:7] = self.time_stamp.to_bytes(4, byteorder='big')
+        header[7:9] = self.ack_num.to_bytes(2, byteorder='big')
         return bytes(header) + self.payload
 
     @classmethod
