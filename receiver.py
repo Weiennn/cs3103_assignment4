@@ -1,47 +1,39 @@
-import socket
-import struct
-import time
-import random
-import json
 from gameNetServerAPI import GameNetServerAPI
+import time
 
-# Packet header: | ChannelType (1B) | SeqNo (2B) | Timestamp (4B) | Payload |
-
+def packet_handler(payload, channel_type):
+    """
+    Custom callback function to handle received packets
+    """
+    channel_name = "RELIABLE" if channel_type == 1 else "UNRELIABLE"
+    
+    # Try to decode as text, otherwise show as hex
+    try:
+        message = payload.decode('utf-8')
+        print(f"[{channel_name}] Message: {message}")
+    except UnicodeDecodeError:
+        print(f"[{channel_name}] Binary data ({len(payload)} bytes): {payload.hex()[:20]}...")
 
 def main():
-    server = GameNetServerAPI(addr='localhost', port=54321)
-    print("GameNetServerAPI initialized on localhost:54321")
-
-    inactivity_limit = 10  # seconds
-    last_packet_time = time.time()
-
+    server = GameNetServerAPI(
+        addr="localhost",
+        port=12001,
+        timeout_threshold=0.7,
+        callback_function=packet_handler
+    )
+    
+    # Start the server
+    server.start()
+    
     try:
+        print("Receiver started. Press Ctrl+C to stop...")
         while True:
-            packet_data = server.get_data()
-            if packet_data:
-                last_packet_time = time.time()
-                payload, channel_type = packet_data
-                try:
-                    decoded = payload.decode('utf-8')
-                except Exception:
-                    decoded = repr(payload)
-                print(f"Channel Type: {channel_type}")
-                print(f"Payload: {decoded}")
-                print("-----------------------")
-            else:
-                time.sleep(0.1)
-
-            # Exit if no packet received for inactivity_limit seconds
-            if time.time() - last_packet_time > inactivity_limit:
-                print(f"No packets received for {inactivity_limit} seconds. Exiting receiver.")
-                break
-
+            time.sleep(1)
     except KeyboardInterrupt:
-        print("Shutting down receiver (KeyboardInterrupt)")
+        print("\nShutting down...")
     finally:
         server.close()
-        print("Server socket closed")
-
+        server.print_metrics()
 
 if __name__ == "__main__":
     main()
