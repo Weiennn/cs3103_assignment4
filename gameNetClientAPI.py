@@ -204,8 +204,7 @@ if __name__ == "__main__":
         client.send_packet(b'Hello Unreliable', 0)
         client.send_packet(b'Hello Reliable 2', 1)
 
-        while True:
-            time.sleep(1)  # simulate active session
+        client.close() 
     except KeyboardInterrupt:
         print("\n[INTERRUPT] Ctrl+C detected, closing client...")
         client.close()
