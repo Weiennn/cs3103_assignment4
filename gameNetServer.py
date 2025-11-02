@@ -1,3 +1,4 @@
+import json
 import socket
 import time
 import threading
@@ -37,6 +38,10 @@ class GameNetServer:
         self.shutdown_event = threading.Event()
         self.lock = threading.Lock()
 
+        # Performance metrics
+        self.total_reliable_sent = 0
+        self.total_unreliable_sent = 0
+        self.total_reliable_success = 0
         self.metrics = {
             "reliable": {
                 "packets_received": 0,
@@ -102,6 +107,11 @@ class GameNetServer:
             print(
                 f"[UNRELIABLE] SeqNo={packet.seq_num}, Latency={latency:.2f}ms, Payload={packet.payload[:50]}")
             return [packet.payload, packet.channel_type]
+        if packet.channel_type == 2:
+            print(f"[SESSION SUMMARY RECEIVED] {packet.payload}")
+            self._process_session_summary(packet.payload)
+            self._send_session_ack()
+            return None
 
         # Reliable channel
         self.metrics["reliable"]["packets_received"] += 1
@@ -128,6 +138,8 @@ class GameNetServer:
                 self.reliable_buffer[packet.seq_num] = packet
                 if packet.seq_num != self.expected_sequence:
                     self.metrics["reliable"]["out_of_order"] += 1
+
+                self.total_reliable_success += 1
                 print(
                     f"Buffered SeqNo={packet.seq_num}, Latency={latency:.2f}ms, "
                     f"Expected={self.expected_sequence}, Buffer_size={len(self.reliable_buffer)}"
@@ -222,12 +234,20 @@ class GameNetServer:
             else:
                 self._start_waiting(self.expected_sequence)
 
+    # For reliable packets
     def _send_ack(self, seq_num: int):
         """Send ACK for specific sequence number"""
         if self.client_addr is not None:
             print(f"[ACK SENT] SeqNo={seq_num}")
             ack_pkt = self.create_ack_packet(seq_num)
             self.socket.sendto(ack_pkt, self.client_addr)
+
+    def _send_session_ack(self):
+        """Send ACK for session summary"""
+        if self.client_addr is not None:
+            ack_packet = GameNetPacket(channel_type=2, seq_num=0, ack_num=0)
+            print(f"[SESSION SUMMARY ACK SENT]")
+            self.socket.sendto(ack_packet.to_bytes(), self.client_addr)
 
     def _drain_in_order(self):
         """Deliver buffered packets in order and slide receive window"""
@@ -262,6 +282,17 @@ class GameNetServer:
         distance_behind = (self.expected_sequence - seq_num) % MAX_SEQ_NUM
         # Packets 1 to HALF_SEQ_SPACE-1 behind are old (already delivered)
         return 0 < distance_behind < HALF_SEQ_SPACE
+    
+    def _process_session_summary(self, payload: bytes):
+        """Process session summary received from client"""
+        try:
+            summary = json.loads(payload.decode())
+            self.total_reliable_sent += summary.get("total_reliable_sent", 0)
+            self.total_unreliable_sent += summary.get("total_unreliable_sent", 0)
+            print(f"[SESSION SUMMARY] Reliable Sent={self.total_reliable_sent}, Unreliable Sent={self.total_unreliable_sent}")
+
+        except Exception as e:
+            print(f"[ERROR] Failed to process session summary: {e}")
 
     def get_metrics(self):
         """Calculate and return performance metrics"""
@@ -276,11 +307,13 @@ class GameNetServer:
                 "timeouts": self.metrics["reliable"]["timeouts"],
                 "avg_latency_ms": sum(self.metrics["reliable"]["latencies"]) / len(self.metrics["reliable"]["latencies"]) if self.metrics["reliable"]["latencies"] else 0,
                 "throughput_bytes": (self.metrics["reliable"]["bytes_received"]) / duration,
+                "delivery_ratio_pct": self.total_reliable_success / self.total_reliable_sent * 100 if self.total_reliable_sent > 0 else 0
             },
             "unreliable": {
                 "packets_received": self.metrics["unreliable"]["packets_received"],
                 "avg_latency_ms": sum(self.metrics["unreliable"]["latencies"]) / len(self.metrics["unreliable"]["latencies"]) if self.metrics["unreliable"]["latencies"] else 0,
-                "throughput_bytes": (self.metrics["unreliable"]["bytes_received"]) / duration
+                "throughput_bytes": (self.metrics["unreliable"]["bytes_received"]) / duration,
+                "delivery_ratio_pct": self.metrics["unreliable"]["packets_received"] / self.total_unreliable_sent * 100 if self.total_unreliable_sent > 0 else 0
             }
         }
 
@@ -305,6 +338,7 @@ class GameNetServer:
         print(f"Packets Received: {metrics["unreliable"]["packets_received"]}")
         print(f"Avg Latency: {metrics["unreliable"]["avg_latency_ms"]:.2f} ms")
         print(f"Throughput: {metrics["unreliable"]["throughput_bytes"]:.2f} bps")
+        print(f"Delivery Ratio: {metrics["unreliable"]["delivery_ratio_pct"]:.2f}%\n")
 
     def close(self):
         """Clean shutdown of server."""
