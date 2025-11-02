@@ -1,4 +1,4 @@
-from gameNetServerAPI import GameNetServer
+from gameNetServerAPI import GameNetServerAPI
 import time
 
 def packet_handler(payload, channel_type):
@@ -15,7 +15,7 @@ def packet_handler(payload, channel_type):
         print(f"[{channel_name}] Binary data ({len(payload)} bytes): {payload.hex()[:20]}...")
 
 def main():
-    server = GameNetServer(
+    server = GameNetServerAPI(
         addr="localhost",
         port=54321,
         timeout_threshold=0.7,
