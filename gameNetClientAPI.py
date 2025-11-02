@@ -142,7 +142,12 @@ if __name__ == "__main__":
     client = GameNetClientAPI('localhost', 12345, 'localhost', 12001)
 
     client.send_packet(b'Hello Reliable 1', 1)
-    client.send_packet(b'Hello Unreliable', 0)
+    client.send_packet(b'Hello Unreliable 1', 0)
     client.send_packet(b'Hello Reliable 2', 1)
+    client.send_packet(b'Hello Unreliable 2', 0)
+    client.send_packet(b'Hello Reliable 3', 1)
+    client.send_packet(b'Hello Unreliable 3', 0)
+    client.send_packet(b'Hello Reliable 4', 1)
+    client.send_packet(b'Hello Unreliable 4', 0)
 
-    time.sleep(5)  # wait for packets to be sent and acks to be received
+    time.sleep(10)  # wait for packets to be sent and acks to be received
