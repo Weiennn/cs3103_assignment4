@@ -37,16 +37,31 @@ echo
 echo "[*] Starting receiver..."
 python3 receiver2.py &
 RECEIVER_PID=$!
+echo "[*] Receiver PID: $RECEIVER_PID"
 sleep 1
 
-# start sender application
+# start sender application IN BACKGROUND
 echo "[*] Starting sender..."
-python3 gameNetClientAPI.py
+python3 gameNetClientAPI.py &
+SENDER_PID=$!
+echo "[*] Sender PID: $SENDER_PID"
 
-# kill receiver process some time after sender finishes
-sleep 10
-echo "[*] Stopping receiver..."
+# Wait for the SENDER process to complete
+echo "[*] Waiting for sender (PID $SENDER_PID) to complete its run..."
+wait $SENDER_PID
+echo "[*] Sender finished."
+
+# Give receiver a moment to process any final packets (like the session summary)
+echo "[*] Waiting 2s for receiver to process final packets..."
+sleep 2
+
+# Stop the receiver using SIGINT (Ctrl+C) to trigger its graceful shutdown
+echo "[*] Stopping receiver (PID $RECEIVER_PID)..."
 kill $RECEIVER_PID 2>/dev/null
+
+# Wait for the receiver process to fully terminate
+wait $RECEIVER_PID 2>/dev/null
+echo "[*] Receiver stopped."
 
 # reset 
 echo
