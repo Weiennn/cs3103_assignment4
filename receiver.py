@@ -3,14 +3,14 @@ import struct
 import time
 import random
 import json
-from gameNetServer import GameNetServer
+from gameNetServerAPI import GameNetServerAPI
 
 # Packet header: | ChannelType (1B) | SeqNo (2B) | Timestamp (4B) | Payload |
 
 
 def main():
-    server = GameNetServer(addr='localhost', port=54321)
-    print("GameNetServer initialized on localhost:54321")
+    server = GameNetServerAPI(addr='localhost', port=54321)
+    print("GameNetServerAPI initialized on localhost:54321")
 
     inactivity_limit = 10  # seconds
     last_packet_time = time.time()

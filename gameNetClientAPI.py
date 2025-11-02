@@ -199,9 +199,14 @@ class GameNetClientAPI:
 if __name__ == "__main__":
     client = GameNetClientAPI('localhost', 12345, 'localhost', 12001)
 
-    client.send_packet(b'Hello Reliable 1', 1)
-    client.send_packet(b'Hello Unreliable', 0)
-    client.send_packet(b'Hello Reliable 2', 1)
+    try:
+        client.send_packet(b'Hello Reliable 1', 1)
+        client.send_packet(b'Hello Unreliable', 0)
+        client.send_packet(b'Hello Reliable 2', 1)
 
-    time.sleep(5)  # wait for packets to be sent and acks to be received
-    client.close()
+        while True:
+            time.sleep(1)  # simulate active session
+    except KeyboardInterrupt:
+        print("\n[INTERRUPT] Ctrl+C detected, closing client...")
+        client.close()
+        print("[EXITED GRACEFULLY]")

@@ -14,7 +14,7 @@ DEFAULT_PORT = 12001
 DEFAULT_ADDR = "localhost"
 
 
-class GameNetServer:
+class GameNetServerAPI:
     def __init__(self, addr=DEFAULT_ADDR, port=DEFAULT_PORT, timeout_threshold=0.2, callback_function=None):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind((addr, port))
@@ -354,13 +354,14 @@ class GameNetServer:
         print(f"Timeouts: {metrics["reliable"]["timeouts"]}")
         print(f"Avg Latency: {metrics["reliable"]["avg_latency_ms"]:.2f} ms")
         print(f"Throughput: {metrics["reliable"]["throughput_bytes"]:.2f} bps")
-        print(f"Jitter: {metrics["reliable"]["jitter_ms"]:.2f} ms")
+        print(f"Delivery Ratio: {metrics["reliable"]["delivery_ratio_pct"]:.2f}%")
+        print(f"Jitter: {metrics["reliable"]["jitter_ms"]:.2f} ms\n")
 
         print("UNRELIABLE CHANNEL:")
         print(f"Packets Received: {metrics["unreliable"]["packets_received"]}")
         print(f"Avg Latency: {metrics["unreliable"]["avg_latency_ms"]:.2f} ms")
         print(f"Throughput: {metrics["unreliable"]["throughput_bytes"]:.2f} bps")
-        print(f"Delivery Ratio: {metrics["unreliable"]["delivery_ratio_pct"]:.2f}%\n")
+        print(f"Delivery Ratio: {metrics["unreliable"]["delivery_ratio_pct"]:.2f}%")
         print(f"Jitter: {metrics["unreliable"]["jitter_ms"]:.2f} ms")
 
     def close(self):
@@ -377,9 +378,9 @@ if __name__ == "__main__":
             f"[HELLO FROM RECEIVER APPLICATION] {channel_name}: {payload[:100]}")
 
     # Create server with callback
-    server = GameNetServer(
+    server = GameNetServerAPI(
         addr="localhost",
-        port=54321,
+        port=12001,
         timeout_threshold=0.7,  
         callback_function=handle_received_data
     )
