@@ -197,7 +197,7 @@ class GameNetClientAPI:
         print("[SESSION CLOSED COMPLETE]")
 
 if __name__ == "__main__":
-    client = GameNetClientAPI('localhost', 12345, 'localhost', 54321)
+    client = GameNetClientAPI('localhost', 12345, 'localhost', 12001)
 
     client.send_packet(b'Hello Reliable 1', 1)
     client.send_packet(b'Hello Unreliable', 0)

@@ -13,6 +13,7 @@ HALF_SEQ_SPACE = MAX_SEQ_NUM // 2  # Window must be ≤ half sequence space
 DEFAULT_PORT = 12001
 DEFAULT_ADDR = "localhost"
 
+
 class GameNetServer:
     def __init__(self, addr=DEFAULT_ADDR, port=DEFAULT_PORT, timeout_threshold=0.2, callback_function=None):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -21,7 +22,7 @@ class GameNetServer:
 
         # Reliable channel state (Selective Repeat)
         self.reliable_buffer = {}  # {seq_num: packet}
-        self.expected_sequence = 0  
+        self.expected_sequence = 0
         self.first_reliable_packet = True
         self.window_size = SR_WINDOW_SIZE
 
@@ -65,14 +66,16 @@ class GameNetServer:
     def create_ack_packet(self, sequence_number: int) -> bytes:
         """Build an ACK packet using the sequence number received."""
         # ACK the exact packet received
-        ack_packet = GameNetPacket(channel_type=1, seq_num=0, ack_num=sequence_number)
+        ack_packet = GameNetPacket(
+            channel_type=1, seq_num=0, ack_num=sequence_number)
         print(f"[ACK CREATED] {ack_packet}")
         return ack_packet.to_bytes()
 
     def _calculate_latency(self, packet: GameNetPacket) -> float:
         """Calculate one-way latency"""
         if packet.time_stamp > 0:
-            return (time.time() - packet.time_stamp) * 1000  # Convert to ms
+            # time_stamp given in ms
+            return (time.time() * 1000) - packet.time_stamp
         return 0
 
     def _process_socket(self):
@@ -129,7 +132,8 @@ class GameNetServer:
         # Case 1: Duplicate packet (already delivered, behind window)
         if self._has_been_delivered(packet.seq_num):
             self.metrics["reliable"]["duplicates"] += 1
-            print(f"Duplicate SeqNo={packet.seq_num} (Expected={self.expected_sequence}) - Resending ACK")
+            print(
+                f"Duplicate SeqNo={packet.seq_num} (Expected={self.expected_sequence}) - Resending ACK")
             self._send_ack(packet.seq_num)
 
         # Case 2: Packet within receive window [expected_seq, expected_seq + window_size - 1]
@@ -144,11 +148,11 @@ class GameNetServer:
                     f"Buffered SeqNo={packet.seq_num}, Latency={latency:.2f}ms, "
                     f"Expected={self.expected_sequence}, Buffer_size={len(self.reliable_buffer)}"
                 )
-            else: # Duplicate packet within window
+            else:  # Duplicate packet within window
                 self.metrics["reliable"]["duplicates"] += 1
                 print(f"Duplicate buffered SeqNo={packet.seq_num}")
 
-            # Send ACK 
+            # Send ACK
             self._send_ack(packet.seq_num)
 
             # Deliver consecutive packets
@@ -265,7 +269,7 @@ class GameNetServer:
             if self.expected_sequence in self.reliable_buffer:  # Next packet already in output buffer
                 self.waiting_start_time = None
                 self.waiting_for_seq = None
-            else: # Start waiting for new expected sequence
+            else:  # Start waiting for new expected sequence
                 self._start_waiting(self.expected_sequence)
 
     def _is_within_receive_window(self, seq_num: int) -> bool:
@@ -277,7 +281,7 @@ class GameNetServer:
     def _has_been_delivered(self, seq_num: int) -> bool:
         """Check if packet has already been delivered (behind window)"""
         if seq_num == self.expected_sequence:
-            return False  
+            return False
 
         distance_behind = (self.expected_sequence - seq_num) % MAX_SEQ_NUM
         # Packets 1 to HALF_SEQ_SPACE-1 behind are old (already delivered)
@@ -294,6 +298,22 @@ class GameNetServer:
         except Exception as e:
             print(f"[ERROR] Failed to process session summary: {e}")
 
+    def _calculate_jitter(self, latencies):
+        """Calculate jitter following RFC 3550 standard"""
+        if len(latencies) < 2:
+            return 0
+
+        jitter = 0
+
+        for i in range(1, len(latencies)):
+            # Difference between consecutive latencies
+            transit_diff = abs(latencies[i] - latencies[i-1])
+
+            # s->jitter += (1./16.) * ((double)d - s->jitter)
+            jitter = jitter + (transit_diff - jitter) / 16
+
+        return jitter
+
     def get_metrics(self):
         """Calculate and return performance metrics"""
         duration = time.time() - self.start_time if self.start_time else 1
@@ -307,13 +327,15 @@ class GameNetServer:
                 "timeouts": self.metrics["reliable"]["timeouts"],
                 "avg_latency_ms": sum(self.metrics["reliable"]["latencies"]) / len(self.metrics["reliable"]["latencies"]) if self.metrics["reliable"]["latencies"] else 0,
                 "throughput_bytes": (self.metrics["reliable"]["bytes_received"]) / duration,
-                "delivery_ratio_pct": self.total_reliable_success / self.total_reliable_sent * 100 if self.total_reliable_sent > 0 else 0
+                "delivery_ratio_pct": self.total_reliable_success / self.total_reliable_sent * 100 if self.total_reliable_sent > 0 else 0,
+                "jitter_ms": self._calculate_jitter(self.metrics["reliable"]["latencies"])
             },
             "unreliable": {
                 "packets_received": self.metrics["unreliable"]["packets_received"],
                 "avg_latency_ms": sum(self.metrics["unreliable"]["latencies"]) / len(self.metrics["unreliable"]["latencies"]) if self.metrics["unreliable"]["latencies"] else 0,
                 "throughput_bytes": (self.metrics["unreliable"]["bytes_received"]) / duration,
-                "delivery_ratio_pct": self.metrics["unreliable"]["packets_received"] / self.total_unreliable_sent * 100 if self.total_unreliable_sent > 0 else 0
+                "delivery_ratio_pct": self.metrics["unreliable"]["packets_received"] / self.total_unreliable_sent * 100 if self.total_unreliable_sent > 0 else 0,
+                "jitter_ms": self._calculate_jitter(self.metrics["unreliable"]["latencies"])
             }
         }
 
@@ -332,13 +354,14 @@ class GameNetServer:
         print(f"Timeouts: {metrics["reliable"]["timeouts"]}")
         print(f"Avg Latency: {metrics["reliable"]["avg_latency_ms"]:.2f} ms")
         print(f"Throughput: {metrics["reliable"]["throughput_bytes"]:.2f} bps")
-        print(f"Delivery Ratio: {metrics["reliable"]["delivery_ratio_pct"]:.2f}%\n")
+        print(f"Jitter: {metrics["reliable"]["jitter_ms"]:.2f} ms")
 
         print("UNRELIABLE CHANNEL:")
         print(f"Packets Received: {metrics["unreliable"]["packets_received"]}")
         print(f"Avg Latency: {metrics["unreliable"]["avg_latency_ms"]:.2f} ms")
         print(f"Throughput: {metrics["unreliable"]["throughput_bytes"]:.2f} bps")
         print(f"Delivery Ratio: {metrics["unreliable"]["delivery_ratio_pct"]:.2f}%\n")
+        print(f"Jitter: {metrics["unreliable"]["jitter_ms"]:.2f} ms")
 
     def close(self):
         """Clean shutdown of server."""
@@ -350,7 +373,8 @@ if __name__ == "__main__":
     # Callback function that gets called when data is received
     def handle_received_data(payload, channel_type):
         channel_name = "RELIABLE" if channel_type == 1 else "UNRELIABLE"
-        print(f"[HELLO FROM RECEIVER APPLICATION] {channel_name}: {payload[:100]}")
+        print(
+            f"[HELLO FROM RECEIVER APPLICATION] {channel_name}: {payload[:100]}")
 
     # Create server with callback
     server = GameNetServer(
