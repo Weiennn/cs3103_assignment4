@@ -35,13 +35,13 @@ echo
 
 # start receiver in background
 echo "[*] Starting receiver..."
-python3 receiver.py &
+python3 receiver2.py &
 RECEIVER_PID=$!
 sleep 1
 
 # start sender application
 echo "[*] Starting sender..."
-python3 sender.py
+python3 gameNetClientAPI.py
 
 # kill receiver process some time after sender finishes
 sleep 10
