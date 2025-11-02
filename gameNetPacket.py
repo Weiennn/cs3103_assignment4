@@ -1,4 +1,4 @@
-from datetime import datetime
+import time
 
 CHANNEL_TYPE_SIZE = 1
 SEQ_NUM_SIZE = 2
@@ -8,7 +8,7 @@ HEADER_SIZE = CHANNEL_TYPE_SIZE + SEQ_NUM_SIZE + TIME_STAMP_SIZE + ACK_NUM_SIZE
 
 
 class GameNetPacket:
-    def __init__(self, channel_type=0, seq_num=0, time_stamp=int(datetime.now().timestamp()), ack_num=0, payload=b''):
+    def __init__(self, channel_type=0, seq_num=0, time_stamp=int(time.time() * 1000), ack_num=0, payload=b''):
         self.channel_type = channel_type
         self.seq_num = seq_num
         self.time_stamp = time_stamp
