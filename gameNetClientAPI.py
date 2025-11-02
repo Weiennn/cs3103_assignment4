@@ -201,9 +201,14 @@ if __name__ == "__main__":
 
     try:
         client.send_packet(b'Hello Reliable 1', 1)
-        client.send_packet(b'Hello Unreliable', 0)
+        client.send_packet(b'Hello Unreliable 1', 0)
         client.send_packet(b'Hello Reliable 2', 1)
-
+        client.send_packet(b'Hello Unreliable 2', 0)
+        client.send_packet(b'Hello Reliable 3', 1)
+        client.send_packet(b'Hello Unreliable 3', 0)
+        client.send_packet(b'Hello Reliable 4', 1)
+        client.send_packet(b'Hello Unreliable 4', 0)
+        
         client.close() 
     except KeyboardInterrupt:
         print("\n[INTERRUPT] Ctrl+C detected, closing client...")
