@@ -1,4 +1,4 @@
-from gameNetServer import GameNetServer
+from gameNetServerAPI import GameNetServer
 import time
 
 def packet_handler(payload, channel_type):
