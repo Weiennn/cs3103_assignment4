@@ -1,3 +1,4 @@
+import json
 import socket
 import random
 import threading
@@ -30,19 +31,32 @@ class GameNetClientAPI:
         self.lock = threading.Lock()
         self.condition = threading.Condition(self.lock)
 
+        # For performance metrics
+        self.total_reliable_sent = 0
+        self.total_unreliable_sent = 0
+
+        # session closing flags
+        self.session_summary_ack = threading.Event()
+        self.running = True
+
         # background threads
         threading.Thread(target=self.receive_acks, daemon=True).start()
         threading.Thread(target=self.window_packet, daemon=True).start()
 
-    # Add packet to buffer; notify sender thread if waiting
-    def send_packet(self, payload, channel_type):
+    def send_packet(self, payload: any, channel_type: int) -> None:
+        """Add packet to buffer; notify sender thread if waiting."""
+        if channel_type == 1:
+            self.total_reliable_sent += 1
+        elif channel_type == 0:
+            self.total_unreliable_sent += 1
         with self.condition:
             self.buffer.append((payload, channel_type))
             print(f"[BUFFERED] Channel={channel_type} Payload={payload}")
             self.condition.notify_all()  # wake up window thread if waiting
 
     # Background thread: move packets from buffer to send window
-    def window_packet(self):
+    def window_packet(self) -> None:
+        """ Continuously move packets from buffer to send window when space is available."""
         while True:
             with self.condition:
                 # wait until window not full and buffer not empty
@@ -55,7 +69,8 @@ class GameNetClientAPI:
             # send outside the lock to avoid blocking other threads
             self._send_packet_internal(payload, channel_type)
 
-    def _send_packet_internal(self, payload, channel_type):
+    def _send_packet_internal(self, payload: any, channel_type: int) -> None:
+        """Send packet based on channel type."""
         if channel_type == 1:  # Reliable
             with self.lock:
                 seq = self.seq_num
@@ -63,7 +78,7 @@ class GameNetClientAPI:
                     channel_type=1,
                     payload=payload,
                     seq_num=seq,
-                    time_stamp=int(time.time() * 1000)  # ms precision
+                    time_stamp=int(time.time() * 1000)
                 )
 
                 self.send_window[seq] = {
@@ -82,17 +97,25 @@ class GameNetClientAPI:
                 if seq in self.send_window:
                     self.send_window[seq]["timer"] = timer
             timer.start()
-
+        elif channel_type == 2:  # Session Summary
+            packet = GameNetPacket(
+                channel_type=2,
+                payload=payload,
+                time_stamp=int(time.time() * 1000)
+            )
+            self.sock.sendto(packet.to_bytes(), (self.server_addr, self.server_port))
+            print(f"[SEND-SESSION-SUMMARY] {payload}")
         else:  # Unreliable
             packet = GameNetPacket(
                 channel_type=0,
                 payload=payload,
-                time_stamp=int(time.time() * 1000)  # ms precision
+                time_stamp=int(time.time() * 1000)
             )
             self.sock.sendto(packet.to_bytes(), (self.server_addr, self.server_port))
             print(f"[SEND-UNRELIABLE] {payload}")
 
-    def retransmit_packet(self, seq):
+    def retransmit_packet(self, seq: int) -> None:
+        """Retransmit packet if ACK not received within timeout. Drop if retransmission threshold reached."""
         with self.lock:
             entry = self.send_window.get(seq)
             if not entry or self.sock.fileno() == -1:  # socket closed
@@ -114,8 +137,9 @@ class GameNetClientAPI:
             entry["timer"] = timer
             timer.start()
 
-    def receive_acks(self):
-        while True:
+    def receive_acks(self) -> None:
+        """ Continuously receive ACKs from server and process them."""
+        while self.running:
             try:
                 data, addr = self.sock.recvfrom(4096)
                 packet = GameNetPacket.from_bytes(data)
@@ -129,25 +153,60 @@ class GameNetClientAPI:
                             del self.send_window[ack_num]
                             # Notify sender thread that window has space now
                             self.condition.notify()
+                elif packet.channel_type == 2:
+                    print(f"[SESSION SUMMARY ACK RECEIVED]")
+                    self.session_summary_ack.set()
             except BlockingIOError:
                 continue
 
-    def close(self):
+    def close(self) -> None:
+        """Clean shutdown of client; send session summary to server."""
+        print("[CLOSING SESSION...]")
+
+        # Send session summary (total packets sent)
+        summary = {
+            "type": "SESSION_END",
+            "total_reliable_sent": self.total_reliable_sent,
+            "total_unreliable_sent": self.total_unreliable_sent,
+        }
+
+        payload = json.dumps(summary).encode()
+        retries = 3 # number of retries for session summary ack
+        ack_received = False
+
+        for attempt in range(retries):
+            self._send_packet_internal(payload, 2)
+
+            # wait for ack
+            if self.session_summary_ack.wait(timeout=TIMEOUT / 1000):
+                ack_received = True
+                break
+
+            print("[WAITING FOR SESSION SUMMARY ACK...] Retrying...")
+
+        self.running = False
+
+        if not ack_received:
+            print("[SESSION CLOSE WARNING] Server did not ACK session summary.")
+
         with self.lock:
-            for seq, entry in self.send_window.items():
+            for seq, entry in list(self.send_window.items()):
                 entry["timer"].cancel()
-            self.sock.close()
+
+        self.sock.close()
+        print("[SESSION CLOSED COMPLETE]")
 
 if __name__ == "__main__":
     client = GameNetClientAPI('localhost', 12345, 'localhost', 12001)
 
-    client.send_packet(b'Hello Reliable 1', 1)
-    client.send_packet(b'Hello Unreliable 1', 0)
-    client.send_packet(b'Hello Reliable 2', 1)
-    client.send_packet(b'Hello Unreliable 2', 0)
-    client.send_packet(b'Hello Reliable 3', 1)
-    client.send_packet(b'Hello Unreliable 3', 0)
-    client.send_packet(b'Hello Reliable 4', 1)
-    client.send_packet(b'Hello Unreliable 4', 0)
+    try:
+        client.send_packet(b'Hello Reliable 1', 1)
+        client.send_packet(b'Hello Unreliable', 0)
+        client.send_packet(b'Hello Reliable 2', 1)
 
-    time.sleep(10)  # wait for packets to be sent and acks to be received
+        while True:
+            time.sleep(1)  # simulate active session
+    except KeyboardInterrupt:
+        print("\n[INTERRUPT] Ctrl+C detected, closing client...")
+        client.close()
+        print("[EXITED GRACEFULLY]")
