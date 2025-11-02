@@ -35,7 +35,7 @@ echo
 
 # start receiver in background
 echo "[*] Starting receiver..."
-python3 receiver2.py &
+python3 receiver.py &
 RECEIVER_PID=$!
 echo "[*] Receiver PID: $RECEIVER_PID"
 sleep 1
