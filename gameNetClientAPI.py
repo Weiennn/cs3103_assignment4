@@ -38,6 +38,7 @@ class GameNetClientAPI:
 
         # session closing flags
         self.session_summary_ack = threading.Event()
+        self.running = True
 
         # background threads
         threading.Thread(target=self.receive_acks, daemon=True).start()
@@ -139,7 +140,7 @@ class GameNetClientAPI:
 
     def receive_acks(self) -> None:
         """ Continuously receive ACKs from server and process them."""
-        while True:
+        while self.running:
             try:
                 data, addr = self.sock.recvfrom(4096)
                 packet = GameNetPacket.from_bytes(data)
@@ -183,6 +184,8 @@ class GameNetClientAPI:
                 break
 
             print("[WAITING FOR SESSION SUMMARY ACK...] Retrying...")
+
+        self.running = False
 
         if not ack_received:
             print("[SESSION CLOSE WARNING] Server did not ACK session summary.")
