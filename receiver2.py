@@ -1,4 +1,3 @@
-# receiver.py
 from gameNetServer import GameNetServer
 import time
 
@@ -14,12 +13,8 @@ def packet_handler(payload, channel_type):
         print(f"[{channel_name}] Message: {message}")
     except UnicodeDecodeError:
         print(f"[{channel_name}] Binary data ({len(payload)} bytes): {payload.hex()[:20]}...")
-    
-    # Add your custom processing logic here
-    # For example, save to file, update GUI, etc.
 
 def main():
-    # Create server with your custom callback
     server = GameNetServer(
         addr="localhost",
         port=54321,
