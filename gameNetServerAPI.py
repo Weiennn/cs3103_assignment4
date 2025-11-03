@@ -2,6 +2,9 @@ import json
 import socket
 import time
 import threading
+import signal
+import sys
+
 from collections import deque
 from gameNetPacket import GameNetPacket
 
@@ -13,6 +16,11 @@ HALF_SEQ_SPACE = MAX_SEQ_NUM // 2  # Window must be ≤ half sequence space
 DEFAULT_PORT = 12001
 DEFAULT_ADDR = "localhost"
 
+def handle_sigterm(signum, frame):
+    print("\nSIGTERM received...")
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, handle_sigterm)
 
 class GameNetServerAPI:
     def __init__(self, addr=DEFAULT_ADDR, port=DEFAULT_PORT, timeout_threshold=0.2, callback_function=None):

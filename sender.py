@@ -15,7 +15,7 @@ def data_to_send(line_num) -> tuple[int, str]:
             if i == line_num:
                 data = line.strip()
 
-    print(f"Data to send: {data}, isReliable: {isReliable}")    
+    print(f"Data to send: {data}, isReliable: {isReliable}")
     return isReliable, data
 
 def main():
