@@ -24,6 +24,7 @@ echo
 sudo tc qdisc del dev $iface root 2>/dev/null
 
 # apply new netem configuration as speciifed by user
+# sudo tc qdisc add dev $iface root netem delay XX ms XX ms loss XX %
 sudo tc qdisc add dev $iface root netem \
     delay ${delay}ms ${variation}ms \
     loss ${loss}% \
@@ -40,9 +41,9 @@ RECEIVER_PID=$!
 echo "[*] Receiver PID: $RECEIVER_PID"
 sleep 1
 
-# start sender application IN BACKGROUND
+# start sender application in background
 echo "[*] Starting sender..."
-python3 gameNetClientAPI.py &
+python3 sender.py &
 SENDER_PID=$!
 echo "[*] Sender PID: $SENDER_PID"
 

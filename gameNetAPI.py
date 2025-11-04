@@ -5,6 +5,8 @@ from gameNetPacket import GameNetPacket
 import threading
 from collections import deque
 import json
+import signal
+import sys
 
 # Selective Repeat parameters
 SR_WINDOW_SIZE = 5
@@ -19,6 +21,12 @@ TIMEOUT = 0.05  # seconds
 HALF_SEQ_SPACE = MAX_SEQ_NUM // 2  # Window must be ≤ half sequence space
 DEFAULT_SERVER_ADDR = "localhost"
 DEFAULT_SERVER_PORT = 12001
+
+def handle_sigterm(signum, frame):
+    print("\nSIGTERM received...")
+    sys.exit(0)
+
+signal.signal(signal.SIGTERM, handle_sigterm)
 
 class GameNetAPI:
     def __init__(self, mode, client_addr=None, client_port=None, server_addr=None, server_port=None, timeout=TIMEOUT, callback_function=None):
@@ -559,8 +567,9 @@ class GameNetAPI:
         
         try:
             summary = json.loads(payload.decode())
-            self.total_reliable_sent += summary.get("total_reliable_sent", 0)
-            self.total_unreliable_sent += summary.get("total_unreliable_sent", 0)
+            # DEBUG
+            self.total_reliable_sent = summary.get("total_reliable_sent", 0)
+            self.total_unreliable_sent = summary.get("total_unreliable_sent", 0)
             print(f"[SERVER] [SESSION SUMMARY] Reliable Sent={self.total_reliable_sent}, Unreliable Sent={self.total_unreliable_sent}")
 
         except Exception as e:

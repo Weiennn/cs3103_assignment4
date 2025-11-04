@@ -1,39 +1,37 @@
-from gameNetServerAPI import GameNetServerAPI
+from gameNetAPI import GameNetAPI
 import time
 
-def packet_handler(payload, channel_type):
-    """
-    Custom callback function to handle received packets
-    """
-    channel_name = "RELIABLE" if channel_type == 1 else "UNRELIABLE"
-    
-    # Try to decode as text, otherwise show as hex
-    try:
-        message = payload.decode('utf-8')
-        print(f"[{channel_name}] Message: {message}")
-    except UnicodeDecodeError:
-        print(f"[{channel_name}] Binary data ({len(payload)} bytes): {payload.hex()[:20]}...")
-
 def main():
-    server = GameNetServerAPI(
-        addr="localhost",
-        port=12001,
-        timeout_threshold=0.7,
-        callback_function=packet_handler
+    print("Initializing receiver...")
+    server = GameNetAPI(
+        mode="server",
+        server_addr="localhost",
+        server_port=12001,
+        timeout=0.2  # 200ms timeout for processing packets
     )
     
-    # Start the server
-    server.start()
-    
+    print("Receiver started on localhost:12001. Press Ctrl+C to stop...")
     try:
-        print("Receiver started. Press Ctrl+C to stop...")
         while True:
-            time.sleep(1)
+            # Get and process any available data
+            data = server._process_socket()
+            if data:
+                payload, channel_type = data
+                channel_name = "RELIABLE" if channel_type == 1 else "UNRELIABLE"
+                try:
+                    message = payload.decode('utf-8')
+                    print(f"[{channel_name}] Message: {message}")
+                except UnicodeDecodeError:
+                    print(f"[{channel_name}] Binary data ({len(payload)} bytes): {payload.hex()[:20]}...")
+            else:
+                # Sleep briefly if no data to avoid busy-waiting
+                time.sleep(0.1)
+                
     except KeyboardInterrupt:
-        print("\nShutting down...")
+        print("\nShutting down receiver...")
     finally:
-        server.close()
-        server.print_metrics()
+        server.close_server()
+        print("\nReceiver shutdown complete.")
 
 if __name__ == "__main__":
     main()
