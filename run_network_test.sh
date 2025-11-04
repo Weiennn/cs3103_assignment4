@@ -40,9 +40,9 @@ RECEIVER_PID=$!
 echo "[*] Receiver PID: $RECEIVER_PID"
 sleep 1
 
-# start sender application IN BACKGROUND
+# start sender application in background
 echo "[*] Starting sender..."
-python3 gameNetClientAPI.py &
+python3 sender.py &
 SENDER_PID=$!
 echo "[*] Sender PID: $SENDER_PID"
 
