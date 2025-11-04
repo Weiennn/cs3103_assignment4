@@ -7,7 +7,7 @@ def main():
         mode="server",
         server_addr="localhost",
         server_port=12001,
-        timeout=0.7  # 200ms timeout for processing packets
+        timeout=0.2  # 200ms timeout for processing packets
     )
     
     print("Receiver started on localhost:12001. Press Ctrl+C to stop...")
