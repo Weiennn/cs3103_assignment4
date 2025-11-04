@@ -683,5 +683,4 @@ if __name__ == "__main__":
         print("\n[INTERRUPT] Ctrl+C detected, closing client...")
         client.close_client()
         time.sleep(1)  # give some time for server to process
-    finally: 
         server.close_server()
