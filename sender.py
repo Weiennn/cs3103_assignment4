@@ -1,37 +1,76 @@
-import socket
-import struct
 import time
 import random
-import json
-from gameNetClientAPI import GameNetClientAPI
-# import some API 
+from gameNetAPI import GameNetAPI
 
-# Packet header: | ChannelType (1B) | SeqNo (2B) | Timestamp (4B) | Payload |
-
-def data_to_send(line_num) -> tuple[int, str]:
-    isReliable = random.randint(0, 1)
-    with open('gamedata.txt', 'r') as file:
-        for i, line in enumerate(file):
-            if i == line_num:
-                data = line.strip()
-
-    print(f"Data to send: {data}, isReliable: {isReliable}")
-    return isReliable, data
+def data_to_send(line_num: int) -> tuple[int, bytes]:
+    """
+    Read a specific line from gamedata.txt and randomly decide reliability.
+    Returns (channel_type, payload) where channel_type is:
+    - 1 for reliable transmission
+    - 0 for unreliable transmission
+    """
+    try:
+        with open('gamedata.txt', 'r') as file:
+            lines = file.readlines()
+            if line_num < len(lines):
+                data = lines[line_num].strip()
+                # 50% chance of reliable transmission
+                channel_type = random.randint(0, 1)
+                print(f"Line {line_num}: {data} -> {'Reliable' if channel_type == 1 else 'Unreliable'}")
+                return channel_type, data.encode('utf-8')
+            else:
+                return None
+    except FileNotFoundError:
+        print("Error: gamedata.txt not found!")
+        return None
+    except Exception as e:
+        print(f"Error reading gamedata.txt: {e}")
+        return None
 
 def main():
-    # instantiate gameNetAPI 
-    RECEIVER_ADDR = 'localhost'
-    RECEIVER_PORT = 54321
+    print("Initializing sender...")
+    
+    # Create GameNetAPI in client mode
+    client = GameNetAPI(
+        mode="client",
+        client_addr="localhost",
+        client_port=12345,
+        server_addr="localhost",
+        server_port=12001,  # Match the receiver's port
+        timeout=0.2  # 200ms timeout
+    )
 
-    SENDER_ADDR = 'localhost'
-    SENDER_PORT = 12345
-    client = GameNetClientAPI(SENDER_ADDR, SENDER_PORT, RECEIVER_ADDR, RECEIVER_PORT)
+    print("Sender started. Sending data from gamedata.txt...")
+    
+    try:
+        line_num = 0
+        while True:
+            result = data_to_send(line_num)
+            if line_num >= len(open('gamedata.txt').readlines()):
+                print("Reached end of file.")
+                break
+            elif result is None:
+                print("An error occurred.")
+                break
 
-    # line_num = 0
-    # while line_num < 100:  
-    isTransmissionReliable, gameData = data_to_send(0)
-    # send data using gameNetAPI
-    client.send_packet(gameData, isTransmissionReliable)
+            channel_type, payload = result
+            client.send_packet(payload, channel_type)
+            
+            line_num += 1
+            # Small delay between sends to avoid overwhelming the receiver
+            time.sleep(0.1)
+            
+    except KeyboardInterrupt:
+        print("\nSending interrupted by user.")
+    finally:
+        # Clean shutdown: close client and print statistics
+        print("\nClosing sender connection...")
+        client.close_client()  # This will send session summary to server
+        
+        # print("\nSender Statistics:")
+        # print(f"Total reliable packets sent: {client.total_reliable_sent}")
+        # print(f"Total unreliable packets sent: {client.total_unreliable_sent}")
+        # print("Shutdown complete.")
 
 if __name__ == "__main__":
     main()
