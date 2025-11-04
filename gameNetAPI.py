@@ -567,8 +567,9 @@ class GameNetAPI:
         
         try:
             summary = json.loads(payload.decode())
-            self.total_reliable_sent += summary.get("total_reliable_sent", 0)
-            self.total_unreliable_sent += summary.get("total_unreliable_sent", 0)
+            # DEBUG
+            self.total_reliable_sent = summary.get("total_reliable_sent", 0)
+            self.total_unreliable_sent = summary.get("total_unreliable_sent", 0)
             print(f"[SERVER] [SESSION SUMMARY] Reliable Sent={self.total_reliable_sent}, Unreliable Sent={self.total_unreliable_sent}")
 
         except Exception as e:
