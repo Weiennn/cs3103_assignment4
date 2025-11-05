@@ -1,12 +1,20 @@
 from gameNetAPI import GameNetAPI
 import time
+from datetime import datetime
 
 
-def handle_received_data(payload, channel_type):
+def handle_received_data(packet):
+    channel_type = packet.channel_type
     channel_name = "RELIABLE" if channel_type == 1 else "UNRELIABLE"
-    payload = payload.decode('utf-8', errors='replace')
+    seq_num = packet.seq_num
+    dt_local = datetime.fromtimestamp(packet.time_stamp / 1000)
+    ack_num = packet.ack_num
+    payload = packet.payload.decode('utf-8') if packet.payload else None
+    
     print(
-        f"[RECEIVER APPLICATION] Channel type: {channel_name} Received: {payload[:100]}")
+        f"[RECEIVER APPLICATION] Received packet with Channel type: {channel_name} seq_num={seq_num}, "
+        f"time_stamp={dt_local.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}, ack_num={ack_num}",
+        f"Payload: {payload if payload else 'No Payload'}")
 
 def main():
     print("Initializing receiver...")
@@ -21,22 +29,8 @@ def main():
     print("Receiver started on localhost:12001. Press Ctrl+C to stop...")
     server.start()
     try:
-        # while True:
-        #     # Get and process any available data
-        #     data = server._process_socket()
-        #     if data:
-        #         payload, channel_type = data
-        #         channel_name = "RELIABLE" if channel_type == 1 else "UNRELIABLE"
-        #         try:
-        #             message = payload.decode('utf-8')
-        #             print(f"[{channel_name}] Message: {message}")
-        #         except UnicodeDecodeError:
-        #             print(f"[{channel_name}] Binary data ({len(payload)} bytes): {payload.hex()[:20]}...")
-        #     else:
-        #         # Sleep briefly if no data to avoid busy-waiting
-        #         time.sleep(0.1)
         while True:
-            time.sleep(1)
+            time.sleep(0.1)
                 
     except KeyboardInterrupt:
         print("\nShutting down receiver...")

@@ -329,10 +329,9 @@ class GameNetAPI:
 
         # Check if we have buffered data to deliver to application
         if self.output_buffer:
-            payload, channel_type = self.output_buffer.popleft()
-            self.callback_function(payload, channel_type)
+            popped_packet = self.output_buffer.popleft()
+            self.callback_function(popped_packet)
             return
-            # return [payload, channel_type]
 
         # Try to receive from socket
         try:
@@ -352,7 +351,7 @@ class GameNetAPI:
 
             print(
                 f"[SERVER] [UNRELIABLE] SeqNo={packet.seq_num}, Latency={latency:.2f}ms, Payload={packet.payload[:50]}")
-            self.callback_function(packet.payload, packet.channel_type)
+            self.callback_function(packet)
             return
         
         if packet.channel_type == 2:
@@ -416,10 +415,9 @@ class GameNetAPI:
 
         # Return data if available after processing
         if self.output_buffer:
-            payload, channel_type = self.output_buffer.popleft()
-            self.callback_function(payload, channel_type)
+            popped_packet = self.output_buffer.popleft()
+            self.callback_function(popped_packet)
             return
-            # return [payload, channel_type]
             
         # Check for timeout and skip missing packets
         self._check_timeout()
@@ -434,12 +432,7 @@ class GameNetAPI:
         print("[SERVER] [THREAD] Receive thread started")
 
         while not self.shutdown_event.is_set():
-            packet_data = self._process_socket()
-
-            if packet_data and self.callback_function:
-                payload, channel_type = packet_data
-                self.callback_function(payload, channel_type)
-
+            self._process_socket()
             time.sleep(0.001)  # Sleep to avoid busy-waiting
 
         print("[SERVER] [THREAD] Receive thread stopped")
@@ -505,7 +498,7 @@ class GameNetAPI:
                 packet = self.reliable_buffer.pop(min_seq)
                 print(
                     f"[SERVER] Delivering SeqNo={min_seq} to receiver application")
-                self.output_buffer.append((packet.payload, packet.channel_type))
+                self.output_buffer.append(packet)
                 min_seq = (min_seq + 1) % MAX_SEQ_NUM
                 # delivered_any = True
                 self.expected_sequence = min_seq
@@ -552,7 +545,7 @@ class GameNetAPI:
         # Else deliver consecutive packets
         while self.expected_sequence in self.reliable_buffer:
             packet = self.reliable_buffer.pop(self.expected_sequence)
-            self.output_buffer.append((packet.payload, packet.channel_type))
+            self.output_buffer.append(packet)
             print(f"[SERVER] Delivered SeqNo={self.expected_sequence}")
             self.expected_sequence = (self.expected_sequence + 1) % MAX_SEQ_NUM
             # delivered_any = True
