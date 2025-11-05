@@ -43,7 +43,7 @@ sleep 1
 
 # start sender application in background
 echo "[*] Starting sender..."
-python3 sender.py &
+python3 random_sender.py &
 SENDER_PID=$!
 echo "[*] Sender PID: $SENDER_PID"
 
@@ -72,3 +72,4 @@ sudo tc qdisc del dev $iface root
 echo "=========================================="
 echo " Test complete. Network reset to normal."
 echo "=========================================="
+

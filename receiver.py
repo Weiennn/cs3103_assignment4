@@ -26,13 +26,35 @@ def main():
         timeout=0.2,  # 200ms timeout for processing packets
         callback_function=handle_received_data
     )
-    
+
     print("Receiver started on localhost:12001. Press Ctrl+C to stop...")
     server.start()
+
+    INACTIVITY_TIMEOUT = 10  # seconds
+    last_packet_time = None
+    first_packet_received = False
+    last_total_packets = 0
     try:
         while True:
+            total_packets = server.metrics['reliable']['packets_received'] + server.metrics['unreliable']['packets_received']
+            if not first_packet_received and total_packets > 0:
+                first_packet_received = True
+                last_packet_time = time.time()
+                last_total_packets = total_packets
+
+            if first_packet_received:
+                # update last_packet_time on new arrival
+                total_packets = server.metrics['reliable']['packets_received'] + server.metrics['unreliable']['packets_received']
+                if total_packets > last_total_packets:
+                    last_packet_time = time.time()
+                    last_total_packets = total_packets
+
+                # exits if inactivity timeout is reached 
+                if time.time() - last_packet_time > INACTIVITY_TIMEOUT:
+                    print(f"No packets received for {INACTIVITY_TIMEOUT} seconds. Auto-terminating receiver.")
+                    break
             time.sleep(0.1)
-                
+
     except KeyboardInterrupt:
         print("\nShutting down receiver...")
     finally:
