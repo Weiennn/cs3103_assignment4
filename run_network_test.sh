@@ -35,10 +35,12 @@ show_menu() {
     echo "2. Unreliable-only (no network impairments)"
     echo "3. Reliable with delay and packet loss"
     echo "4. Reliable with delay and packet reordering"
-    echo "5. Mixed traffic with all impairments"
-    echo "6. Exit"
+    echo "5. Unreliable with delay and packet loss"
+    echo "6. Unreliable with delay and packet reordering"
+    echo "7. Mixed traffic with all impairments"
+    echo "8. Exit"
     echo "=========================================="
-    read -p "Enter choice (1-6): " choice
+    read -p "Enter choice (1-8): " choice
 }
 
 # Function to configure network parameters based on test type
@@ -157,11 +159,21 @@ while true; do
             run_test "reliable_sender.py"
             ;;
         5)
-            echo -e "\nRunning Test 5: Mixed traffic with all impairments"
+            echo -e "\nRunning Test 5: Unreliable with delay and loss"
+            configure_network 3
+            run_test "unreliable_sender.py"
+            ;;
+        6)
+            echo -e "\nRunning Test 6: Unreliable with delay and reordering"
+            configure_network 4
+            run_test "unreliable_sender.py"
+            ;;
+        7)
+            echo -e "\nRunning Test 7: Mixed traffic with all impairments"
             configure_network 5
             run_test "random_sender.py"
             ;;
-        6)
+        8)
             echo "Exiting..."
             break
             ;;
