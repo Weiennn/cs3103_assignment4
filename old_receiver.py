@@ -1,5 +1,21 @@
 from gameNetAPI import GameNetAPI
 import time
+from datetime import datetime
+
+
+def handle_received_data(packet, latency=None):
+    channel_type = packet.channel_type
+    channel_name = "RELIABLE" if channel_type == 1 else "UNRELIABLE"
+    seq_num = packet.seq_num
+    dt_local = datetime.fromtimestamp(packet.time_stamp / 1000)
+    ack_num = packet.ack_num
+    payload = packet.payload.decode('utf-8') if packet.payload else None
+    
+    print(
+        f"[RECEIVER APPLICATION] Received packet with channel_type: {channel_name} seq_number={seq_num}, "
+        f"timestamp={dt_local.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}, ack_number={ack_num}, "
+        f"latency: {latency:.1f}ms" if latency is not None else "",
+        f"payload: {payload if payload else 'No Payload'}")
 
 def main():
     print("Initializing receiver...")
@@ -7,33 +23,14 @@ def main():
         mode="server",
         server_addr="localhost",
         server_port=12001,
-        timeout=0.2  # 200ms timeout for processing packets
+        timeout=0.2,  # 200ms timeout for processing packets
+        callback_function=handle_received_data
     )
     
-    INACTIVITY_TIMEOUT = 10  # seconds
-    last_packet_time = time.time()
-    
-    print(f"Receiver started on localhost:12001. Will exit after {INACTIVITY_TIMEOUT}s of inactivity...")
+    print("Receiver started on localhost:12001. Press Ctrl+C to stop...")
+    server.start()
     try:
         while True:
-            # Get and process any available data
-            data = server._process_socket()
-            if data:
-                last_packet_time = time.time()  # Reset timer on packet received
-                payload, channel_type = data
-                channel_name = "RELIABLE" if channel_type == 1 else "UNRELIABLE"
-                try:
-                    message = payload.decode('utf-8')
-                    print(f"[{channel_name}] Message: {message}")
-                except UnicodeDecodeError:
-                    print(f"[{channel_name}] Binary data ({len(payload)} bytes): {payload.hex()[:20]}...")
-            else:
-                # Check for inactivity timeout
-                if time.time() - last_packet_time > INACTIVITY_TIMEOUT:
-                    print(f"\nNo packets received for {INACTIVITY_TIMEOUT} seconds. Exiting...")
-                    break
-
-            # Sleep briefly if no data to avoid busy-waiting
             time.sleep(0.1)
                 
     except KeyboardInterrupt:
