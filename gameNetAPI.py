@@ -9,7 +9,7 @@ import signal
 import sys
 
 # Selective Repeat parameters
-SR_WINDOW_SIZE = 10
+SR_WINDOW_SIZE = 16
 BUFFER_SIZE = 1024
 MAX_SEQ_NUM = 2 ** 16  # allow wrap for 16-bit sequence numbers
 
@@ -354,12 +354,11 @@ class GameNetAPI:
                 f"[SERVER] [UNRELIABLE] SeqNo={packet.seq_num}, Latency={latency:.2f}ms, Payload={packet.payload[:50]}")
             self.callback_function(packet.payload, packet.channel_type)
             return
-            # return [packet.payload, packet.channel_type]
+        
         if packet.channel_type == 2:
             print(f"[SERVER] [SESSION SUMMARY RECEIVED]")
             self._process_session_summary(packet.payload)
             self._send_session_ack()
-            # self.stop()
             return None
 
         # Reliable channel
@@ -374,7 +373,7 @@ class GameNetAPI:
             self.first_reliable_packet = False
             print(
                 f"[SERVER] Initialized expected_sequence={self.expected_sequence}")
-            self._start_waiting(self.expected_sequence)
+            # self._start_waiting(self.expected_sequence)
             
 
         # Case 1: Duplicate packet (already delivered, behind window)
@@ -390,6 +389,7 @@ class GameNetAPI:
                 self.reliable_buffer[packet.seq_num] = packet
                 if packet.seq_num != self.expected_sequence:
                     self.metrics["reliable"]["out_of_order"] += 1
+                    self._start_waiting(self.expected_sequence)  # Received higher seq, start waiting for expected
 
                 self.total_reliable_success += 1
                 print(
@@ -494,17 +494,29 @@ class GameNetAPI:
             )
 
             # Skip this packet and slide window forward
-            self.expected_sequence = (self.expected_sequence + 1) % MAX_SEQ_NUM
+            # self.expected_sequence = (self.expected_sequence + 1) % MAX_SEQ_NUM
+            
+            if len(self.reliable_buffer) == 0:  # Empty buffer, return
+                return
 
-            # Try to deliver buffered consecutive packets
-            self._drain_in_order()
+            # Try to deliver buffered least consecutive packets
+            min_seq = min(self.reliable_buffer.keys())
+            while min_seq in self.reliable_buffer:
+                packet = self.reliable_buffer.pop(min_seq)
+                print(
+                    f"[SERVER] Delivering SeqNo={min_seq} to receiver application")
+                self.output_buffer.append((packet.payload, packet.channel_type))
+                min_seq = (min_seq + 1) % MAX_SEQ_NUM
+                # delivered_any = True
+                self.expected_sequence = min_seq
+            # self._drain_in_order()
 
             # Update timeout tracking
-            if self.expected_sequence in self.reliable_buffer:
-                self.waiting_start_time = None
-                self.waiting_for_seq = None
-            else:
-                self._start_waiting(self.expected_sequence)
+            # if self.expected_sequence in self.reliable_buffer:
+            self.waiting_start_time = None # Reset timeout until next higher seq packet arrives
+            self.waiting_for_seq = None
+            # else:
+            #     self._start_waiting(self.expected_sequence)
 
     # For reliable packets
     def _send_ack(self, seq_num: int):
@@ -532,22 +544,26 @@ class GameNetAPI:
         if self.mode != "server":
             raise RuntimeError("Method can only be called in server mode.")
         
-        delivered_any = False
+        # delivered_any = False
+        
+        if len(self.reliable_buffer) == 0: # Empty buffer, return
+            return
 
+        # Else deliver consecutive packets
         while self.expected_sequence in self.reliable_buffer:
             packet = self.reliable_buffer.pop(self.expected_sequence)
             self.output_buffer.append((packet.payload, packet.channel_type))
-            print(f"[SERVER] Delivering SeqNo={self.expected_sequence} to receiver application")
+            print(f"[SERVER] Delivered SeqNo={self.expected_sequence}")
             self.expected_sequence = (self.expected_sequence + 1) % MAX_SEQ_NUM
-            delivered_any = True
-
+            # delivered_any = True
+            
         # Update timeout
-        if delivered_any:
-            if self.expected_sequence in self.reliable_buffer:  # Next packet already in output buffer
-                self.waiting_start_time = None
-                self.waiting_for_seq = None
-            else:  # Start waiting for new expected sequence
-                self._start_waiting(self.expected_sequence)
+        # if delivered_any:
+        #     if self.expected_sequence in self.reliable_buffer:  # Next packet already in output buffer
+        # self.waiting_start_time = None # Reset timeout until next higher seq packet arrives
+        # self.waiting_for_seq = None
+            # else:  # Start waiting for new expected sequence
+            #     self._start_waiting(self.expected_sequence)
 
     def _is_within_receive_window(self, seq_num: int) -> bool:
         """Check if seq_num is within receive window [expected_seq, expected_seq + window_size - 1]"""
@@ -644,17 +660,17 @@ class GameNetAPI:
         print(f"Test Duration: {metrics["duration"]:.2f}s\n")
 
         print("RELIABLE CHANNEL:")
-        print(f"Packets Received: {metrics["reliable"]["packets_received"]}")
-        print(f"Duplicates: {metrics["reliable"]["duplicates"]}")
-        print(f"Out-of-Order: {metrics["reliable"]["out_of_order"]}")
-        print(f"Timeouts: {metrics["reliable"]["timeouts"]}")
+        # print(f"Packets Received: {metrics["reliable"]["packets_received"]}")
+        # print(f"Duplicates: {metrics["reliable"]["duplicates"]}")
+        # print(f"Out-of-Order: {metrics["reliable"]["out_of_order"]}")
+        # print(f"Timeouts: {metrics["reliable"]["timeouts"]}")
         print(f"Avg Latency: {metrics["reliable"]["avg_latency_ms"]:.2f} ms")
         print(f"Throughput: {metrics["reliable"]["throughput_bytes"]:.2f} bps")
         print(f"Delivery Ratio: {metrics["reliable"]["delivery_ratio_pct"]:.2f}%")
         print(f"Jitter: {metrics["reliable"]["jitter_ms"]:.2f} ms\n")
 
         print("UNRELIABLE CHANNEL:")
-        print(f"Packets Received: {metrics["unreliable"]["packets_received"]}")
+        # print(f"Packets Received: {metrics["unreliable"]["packets_received"]}")
         print(f"Avg Latency: {metrics["unreliable"]["avg_latency_ms"]:.2f} ms")
         print(f"Throughput: {metrics["unreliable"]["throughput_bytes"]:.2f} bps")
         print(f"Delivery Ratio: {metrics["unreliable"]["delivery_ratio_pct"]:.2f}%")
