@@ -66,8 +66,11 @@ configure_network() {
     esac
     
     # Show current network configuration
-    echo -e "\nCurrent network configuration:"
+    echo -e "\nTest will begin in 5 seconds. Current network configuration:"
     tc qdisc show dev $iface
+
+    # Sleep to allow user to view configuration
+    sleep 5 
     echo
 }
 
