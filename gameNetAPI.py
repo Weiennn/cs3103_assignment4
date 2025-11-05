@@ -9,13 +9,13 @@ import signal
 import sys
 
 # Selective Repeat parameters
-SR_WINDOW_SIZE = 5
+SR_WINDOW_SIZE = 10
 BUFFER_SIZE = 1024
 MAX_SEQ_NUM = 2 ** 16  # allow wrap for 16-bit sequence numbers
 
 # Client parameters
-RETRANSMISSION_THRESHOLD = 0.2  # seconds
-TIMEOUT = 0.05  # seconds
+RETRANSMISSION_STOP_THRESHOLD = 0.2  # seconds | at which we give up retransmitting
+TIMEOUT = 0.05  # seconds | at which we retransmit packets
 
 # Server parameters
 HALF_SEQ_SPACE = MAX_SEQ_NUM // 2  # Window must be ≤ half sequence space
@@ -32,6 +32,7 @@ class GameNetAPI:
     def __init__(self, mode, client_addr=None, client_port=None, server_addr=None, server_port=None, timeout=TIMEOUT, callback_function=None):
         self.mode = mode
         self.timeout = timeout
+        self.retransmission_stop_threshold = RETRANSMISSION_STOP_THRESHOLD
 
         self.lock = threading.Lock()
 
@@ -60,7 +61,7 @@ class GameNetAPI:
     def _init_client_state(self) -> None:
         '''Client-specific state initialization.'''
         self.seq_num = random.randint(1, MAX_SEQ_NUM)
-        self.max_resend_count = RETRANSMISSION_THRESHOLD // self.timeout
+        self.max_resend_count = RETRANSMISSION_STOP_THRESHOLD // self.timeout
 
         self.buffer = []  # stores (payload, channel_type)
         self.send_window = {}  # seq -> {packet, timer, resend_count}
@@ -305,7 +306,7 @@ class GameNetAPI:
         # ACK the exact packet received
         ack_packet = GameNetPacket(
             channel_type=1, seq_num=0, ack_num=sequence_number)
-        print(f"[SERVER] [ACK CREATED] {ack_packet}")
+        # print(f"[SERVER] [ACK CREATED] {ack_packet}")
         return ack_packet.to_bytes()
 
     def _calculate_latency(self, packet: GameNetPacket) -> float:
@@ -326,13 +327,12 @@ class GameNetAPI:
         if self.start_time is None:
             self.start_time = time.time()
 
-        # Check for timeout and skip missing packets
-        self._check_timeout()
-
-        # Check if we have buffered data to deliver
+        # Check if we have buffered data to deliver to application
         if self.output_buffer:
             payload, channel_type = self.output_buffer.popleft()
-            return [payload, channel_type]
+            self.callback_function(payload, channel_type)
+            return
+            # return [payload, channel_type]
 
         # Try to receive from socket
         try:
@@ -352,11 +352,14 @@ class GameNetAPI:
 
             print(
                 f"[SERVER] [UNRELIABLE] SeqNo={packet.seq_num}, Latency={latency:.2f}ms, Payload={packet.payload[:50]}")
-            return [packet.payload, packet.channel_type]
+            self.callback_function(packet.payload, packet.channel_type)
+            return
+            # return [packet.payload, packet.channel_type]
         if packet.channel_type == 2:
             print(f"[SERVER] [SESSION SUMMARY RECEIVED]")
             self._process_session_summary(packet.payload)
             self._send_session_ack()
+            # self.stop()
             return None
 
         # Reliable channel
@@ -369,8 +372,10 @@ class GameNetAPI:
         if self.first_reliable_packet:
             self.expected_sequence = packet.seq_num
             self.first_reliable_packet = False
+            print(
+                f"[SERVER] Initialized expected_sequence={self.expected_sequence}")
             self._start_waiting(self.expected_sequence)
-            print(f"[SERVER] Initialized expected_sequence={self.expected_sequence}")
+            
 
         # Case 1: Duplicate packet (already delivered, behind window)
         if self._has_been_delivered(packet.seq_num):
@@ -412,7 +417,12 @@ class GameNetAPI:
         # Return data if available after processing
         if self.output_buffer:
             payload, channel_type = self.output_buffer.popleft()
-            return [payload, channel_type]
+            self.callback_function(payload, channel_type)
+            return
+            # return [payload, channel_type]
+            
+        # Check for timeout and skip missing packets
+        self._check_timeout()
 
         return None
 
@@ -452,9 +462,9 @@ class GameNetAPI:
             raise RuntimeError("Method can only be called in server mode.")
         
         if self.receive_thread and self.receive_thread.is_alive():
-            print("[SERVER] Stopping receive thread...")
+            print("[SERVER] Stopping receive thread due to stop method given...")
             self.shutdown_event.set()
-            self.receive_thread.join(timeout=2.0)
+            self.receive_thread.join()
 
     def _start_waiting(self, seq_num: int):
         """Start timeout timer for expected sequence number"""
@@ -464,7 +474,7 @@ class GameNetAPI:
         if self.waiting_for_seq != seq_num:
             self.waiting_for_seq = seq_num
             self.waiting_start_time = time.time()
-            print(f"[SERVER] [TIMEOUT] Started waiting for SeqNo={seq_num}")
+            print(f"[SERVER] Started waiting for SeqNo={seq_num}")
 
     def _check_timeout(self):
         """Check if expected packet has timed out and skip if necessary"""
@@ -476,11 +486,11 @@ class GameNetAPI:
 
         elapsed = time.time() - self.waiting_start_time
 
-        if (self.waiting_for_seq == self.expected_sequence and elapsed >= self.timeout):
+        if (self.waiting_for_seq == self.expected_sequence and elapsed >= self.retransmission_stop_threshold):
             self.metrics["reliable"]["timeouts"] += 1
             print(
                 f"[SERVER] [TIMEOUT] SeqNo={self.expected_sequence} timed out after {elapsed:.3f}s "
-                f"(threshold={self.timeout}s). Skipping packet..."
+                f"(threshold={self.retransmission_stop_threshold}s). Skipping packet..."
             )
 
             # Skip this packet and slide window forward
@@ -527,7 +537,7 @@ class GameNetAPI:
         while self.expected_sequence in self.reliable_buffer:
             packet = self.reliable_buffer.pop(self.expected_sequence)
             self.output_buffer.append((packet.payload, packet.channel_type))
-            print(f"[SERVER] Delivered SeqNo={self.expected_sequence}")
+            print(f"[SERVER] Delivering SeqNo={self.expected_sequence} to receiver application")
             self.expected_sequence = (self.expected_sequence + 1) % MAX_SEQ_NUM
             delivered_any = True
 
@@ -660,28 +670,28 @@ class GameNetAPI:
         self.print_metrics()
         print("[SERVER] Shutdown complete.")
 
-if __name__ == "__main__":
-    # Callback function that gets called when data is received
-    def handle_received_data(payload, channel_type):
-        channel_name = "RELIABLE" if channel_type == 1 else "UNRELIABLE"
-        print(
-            f"[HELLO FROM RECEIVER APPLICATION] {channel_name}: {payload[:100]}")
+# if __name__ == "__main__":
+#     # Callback function that gets called when data is received
+#     def handle_received_data(payload, channel_type):
+#         channel_name = "RELIABLE" if channel_type == 1 else "UNRELIABLE"
+#         print(
+#             f"[HELLO FROM RECEIVER APPLICATION] {channel_name}: {payload[:100]}")
         
-    client = GameNetAPI(mode='client', client_addr='localhost', client_port=12345, server_addr='localhost', server_port=12001)
-    server = GameNetAPI(mode='server', server_addr='localhost', server_port=12001, timeout=0.700, callback_function=handle_received_data)
+#     client = GameNetAPI(mode='client', client_addr='localhost', client_port=12345, server_addr='localhost', server_port=12001)
+#     server = GameNetAPI(mode='server', server_addr='localhost', server_port=12001, timeout=0.700, callback_function=handle_received_data)
 
-    # Start the internal thread
-    server.start()
+#     # Start the internal thread
+#     server.start()
 
-    try:
-        client.send_packet(b'Hello Reliable 1', 1)
-        client.send_packet(b'Hello Unreliable', 0)
-        client.send_packet(b'Hello Reliable 2', 1)
+#     try:
+#         client.send_packet(b'Hello Reliable 1', 1)
+#         client.send_packet(b'Hello Unreliable', 0)
+#         client.send_packet(b'Hello Reliable 2', 1)
 
-        while True:
-            time.sleep(1)  # simulate active session
-    except KeyboardInterrupt:
-        print("\n[INTERRUPT] Ctrl+C detected, closing client...")
-        client.close_client()
-        time.sleep(1)  # give some time for server to process
-        server.close_server()
+#         while True:
+#             time.sleep(1)  # simulate active session
+#     except KeyboardInterrupt:
+#         print("\n[INTERRUPT] Ctrl+C detected, closing client...")
+#         client.close_client()
+#         time.sleep(1)  # give some time for server to process
+#         server.close_server()
