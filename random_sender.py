@@ -8,6 +8,7 @@ def data_to_send(line_num: int) -> tuple[int, bytes]:
     Returns (channel_type, payload) where channel_type is:
     - 1 for reliable transmission
     - 0 for unreliable transmission
+    This function randomly chooses between reliable and unreliable transmission for each line.
     """
     try:
         with open('gamedata.txt', 'r') as file:
