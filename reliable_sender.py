@@ -67,11 +67,6 @@ def main():
         # Clean shutdown: close client and print statistics
         print("\nClosing sender connection...")
         client.close_client()  # This will send session summary to server
-        
-        # print("\nSender Statistics:")
-        # print(f"Total reliable packets sent: {client.total_reliable_sent}")
-        # print(f"Total unreliable packets sent: {client.total_unreliable_sent}")
-        # print("Shutdown complete.")
 
 if __name__ == "__main__":
     main()
