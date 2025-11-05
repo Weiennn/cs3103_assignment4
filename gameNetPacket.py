@@ -1,4 +1,5 @@
 import time
+from datetime import datetime
 
 CHANNEL_TYPE_SIZE = 1
 SEQ_NUM_SIZE = 2
@@ -35,7 +36,8 @@ class GameNetPacket:
         return cls(channel_type, seq_num, time_stamp, ack_num, payload)
 
     def __repr__(self):
+        dt_local = datetime.fromtimestamp(self.time_stamp / 1000)
         return (f"GameNetPacket(channel_type={self.channel_type}, "
-                f"seq_num={self.seq_num}, time_stamp={self.time_stamp}, "
+                f"seq_num={self.seq_num}, time_stamp={dt_local.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}, "
                 f"ack_num={self.ack_num}, "
-                f"payload_length={len(self.payload)})")
+                f"payload={self.payload})")
