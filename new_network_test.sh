@@ -1,5 +1,30 @@
+
 #!/bin/bash
 # Test runs on loopback (lo)
+
+# Global PIDs for trap
+RECEIVER_PID=""
+SENDER_PID=""
+
+# Trap SIGINT (Ctrl+C) for cleanup
+cleanup() {
+    echo -e "\n[!] Caught Ctrl+C. Cleaning up..."
+    if [[ -n "$SENDER_PID" ]]; then
+        echo "Killing sender (PID $SENDER_PID)..."
+        kill $SENDER_PID 2>/dev/null
+    fi
+    if [[ -n "$RECEIVER_PID" ]]; then
+        echo "Killing receiver (PID $RECEIVER_PID)..."
+        kill $RECEIVER_PID 2>/dev/null
+    fi 
+    
+    echo "Resetting network configuration..."
+    sudo tc qdisc del dev lo root
+    sleep 5
+    echo "Exiting."
+    exit 1
+}
+trap cleanup SIGINT
 
 # Function to display menu and get user choice
 show_menu() {
@@ -21,16 +46,16 @@ configure_network() {
     local test_type=$1
     local iface="lo"
     
-    # Remove any existing network configuration
+    # reset any existing config 
     sudo tc qdisc del dev $iface root 2>/dev/null
     
     case $test_type in
         1|2)
-            # No network impairments
+            # Clean network
             echo "No network impairments applied."
             ;;
         3)
-            # Prompt for delay and loss parameters
+            # delay and loss required from user
             read -p "Enter average delay (ms): " delay
             read -p "Enter variation in delay (ms): " variation
             read -p "Enter packet loss percentage (%): " loss
@@ -39,7 +64,7 @@ configure_network() {
             sudo tc qdisc add dev $iface root netem delay ${delay}ms ${variation}ms loss ${loss}%
             ;;
         4)
-            # Prompt for delay and reordering parameters
+            # delay and reordering parameters required from user
             read -p "Enter average delay (ms): " delay
             read -p "Enter variation in delay (ms): " variation
             read -p "Enter packet reorder percentage (%): " reorder
@@ -49,7 +74,7 @@ configure_network() {
             sudo tc qdisc add dev $iface root netem delay ${delay}ms ${variation}ms reorder ${reorder}% ${correlation}%
             ;;
         5)
-            # Prompt for all parameters
+            # delay, loss, and reordering required from user
             read -p "Enter average delay (ms): " delay
             read -p "Enter variation in delay (ms): " variation
             read -p "Enter packet loss percentage (%): " loss
@@ -65,11 +90,11 @@ configure_network() {
             ;;
     esac
     
-    # Show current network configuration
+    # show current network configuration
     echo -e "\nTest will begin in 5 seconds. Current network configuration:"
     tc qdisc show dev $iface
 
-    # Sleep to allow user to view configuration
+    # sleep to allow user to view configuration
     sleep 5 
     echo
 }
@@ -78,36 +103,35 @@ configure_network() {
 run_test() {
     local sender_script=$1
     
-    # Start receiver in background
+    # start receiver in background
     echo "[*] Starting receiver..."
     python3 receiver.py &
     RECEIVER_PID=$!
     echo "[*] Receiver PID: $RECEIVER_PID"
     sleep 1
 
-    # Start sender application in background
+    # start sender application in background
     echo "[*] Starting sender ($sender_script)..."
     python3 "$sender_script" &
     SENDER_PID=$!
     echo "[*] Sender PID: $SENDER_PID"
 
-    # Wait for the sender process to complete
+    # wait for the sender process to complete
     echo "[*] Waiting for sender to complete..."
     wait $SENDER_PID
     echo "[*] Sender finished."
 
-    # Give receiver time to process final packets
+    # give receiver time to process final packets
     echo "[*] Waiting 2s for receiver to process final packets..."
     sleep 2
 
-    # Stop the receiver
+    # stop the receiver
     echo "[*] Stopping receiver..."
     kill $RECEIVER_PID 2>/dev/null
     wait $RECEIVER_PID 2>/dev/null
     echo "[*] Receiver stopped."
 }
 
-# Main test execution loop
 while true; do
     show_menu
     
@@ -147,7 +171,7 @@ while true; do
             ;;
     esac
     
-    # Clean up network configuration
+    # RESET network configuration 
     echo -e "\n[*] Cleaning up network configuration..."
     sudo tc qdisc del dev lo root
     
@@ -155,7 +179,7 @@ while true; do
     echo " Test complete. Network reset to normal."
     echo "=========================================="
     
-    # Run another test if wanted
+    # repeat test if wanted
     read -p "Run another test? (y/n): " another
     [[ $another != "y" ]] && break
 done
