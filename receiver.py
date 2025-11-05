@@ -3,7 +3,7 @@ import time
 from datetime import datetime
 
 
-def handle_received_data(packet):
+def handle_received_data(packet, latency=None):
     channel_type = packet.channel_type
     channel_name = "RELIABLE" if channel_type == 1 else "UNRELIABLE"
     seq_num = packet.seq_num
@@ -12,9 +12,10 @@ def handle_received_data(packet):
     payload = packet.payload.decode('utf-8') if packet.payload else None
     
     print(
-        f"[RECEIVER APPLICATION] Received packet with Channel type: {channel_name} seq_num={seq_num}, "
-        f"time_stamp={dt_local.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}, ack_num={ack_num}",
-        f"Payload: {payload if payload else 'No Payload'}")
+        f"[RECEIVER APPLICATION] Received packet with channel_type: {channel_name} seq_number={seq_num}, "
+        f"timestamp={dt_local.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}, ack_number={ack_num}, "
+        f"latency: {latency:.1f}ms" if latency is not None else "",
+        f"payload: {payload if payload else 'No Payload'}")
 
 def main():
     print("Initializing receiver...")
