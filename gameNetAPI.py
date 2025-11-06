@@ -638,14 +638,14 @@ class GameNetAPI:
         # print(f"Out-of-Order: {metrics["reliable"]["out_of_order"]}")
         # print(f"Timeouts: {metrics["reliable"]["timeouts"]}")
         print(f"Avg Latency: {metrics["reliable"]["avg_latency_ms"]:.2f} ms")
-        print(f"Throughput: {metrics["reliable"]["throughput_bytes"]:.2f} bps")
+        print(f"Throughput: {metrics["reliable"]["throughput_bytes"]:.2f} bytes per second")
         print(f"Delivery Ratio: {metrics["reliable"]["delivery_ratio_pct"]:.2f}%")
         print(f"Jitter: {metrics["reliable"]["jitter_ms"]:.2f} ms\n")
 
         print("UNRELIABLE CHANNEL:")
         # print(f"Packets Received: {metrics["unreliable"]["packets_received"]}")
         print(f"Avg Latency: {metrics["unreliable"]["avg_latency_ms"]:.2f} ms")
-        print(f"Throughput: {metrics["unreliable"]["throughput_bytes"]:.2f} bps")
+        print(f"Throughput: {metrics["unreliable"]["throughput_bytes"]:.2f} bytes per second")
         print(f"Delivery Ratio: {metrics["unreliable"]["delivery_ratio_pct"]:.2f}%")
         print(f"Jitter: {metrics["unreliable"]["jitter_ms"]:.2f} ms")
 
